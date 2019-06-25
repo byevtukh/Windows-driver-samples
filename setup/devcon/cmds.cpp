@@ -22,6 +22,7 @@ struct GenericContext {
     LPCTSTR strSuccess;
     LPCTSTR strReboot;
     LPCTSTR strFail;
+    LPCTSTR strId;
 };
 
 #define FIND_DEVICE         0x00000001 // display device
@@ -1437,6 +1438,26 @@ Return Value:
 
     UNREFERENCED_PARAMETER(Index);
 
+    if (nullptr != pControlContext->strId) {
+        BYTE buffer[MAX_PATH];
+        DWORD dwSize;
+        BOOL const bStatus = ::SetupDiGetDeviceRegistryProperty(Devs, DevInfo, SPDRP_DRIVER, nullptr, buffer, sizeof buffer, &dwSize);
+
+        if (!bStatus) {
+            return EXIT_OK;
+        }
+
+        LPCTSTR driverReg = (LPCTSTR)buffer;
+        while (*driverReg != _T('\\')) { driverReg++; }
+
+        long const currentId = ::_tcstol(++driverReg, nullptr, 10);
+        long const removeId = ::_tcstol(pControlContext->strId, nullptr, 10);
+
+        if (currentId != removeId) {
+            return EXIT_OK;
+        }
+    }
+
     devInfoListDetail.cbSize = sizeof(devInfoListDetail);
     if((!SetupDiGetDeviceInfoListDetail(Devs,&devInfoListDetail)) ||
             (CM_Get_Device_ID_Ex(DevInfo->DevInst,devID,MAX_DEVICE_ID_LEN,0,devInfoListDetail.RemoteMachineHandle)!=CR_SUCCESS)) {
@@ -1535,6 +1556,15 @@ Return Value:
     context.strReboot = strReboot;
     context.strSuccess = strRemove;
     context.strFail = strFail;
+    context.strId = nullptr;
+
+    if (argc >= 3) {
+        PCTSTR const cmd = argv[1];
+        if ((cmd[0] == _T('-') || cmd[0] == _T('/')) && cmd[1] == _T('d')) {
+            context.strId = argv[2];
+        }
+    }
+
     failcode = EnumerateDevices(BaseName,Machine,DIGCF_PRESENT,argc,argv,RemoveCallback,&context);
 
     if(failcode == EXIT_OK) {
@@ -1607,6 +1637,15 @@ EXIT_xxxx
     context.strReboot = strReboot;
     context.strSuccess = strRemove;
     context.strFail = strFail;
+    context.strId = nullptr;
+
+    if (argc >= 3) {
+        PCTSTR const cmd = argv[1];
+        if ((cmd[0] == _T('-') || cmd[0] == _T('/')) && cmd[1] == _T('d')) {
+            context.strId = argv[2];
+        }
+    }
+
     failcode = EnumerateDevices(BaseName, Machine, 0, argc, argv, RemoveCallback, &context);
 
     if (failcode == EXIT_OK) {
